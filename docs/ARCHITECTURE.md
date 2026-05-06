@@ -113,7 +113,7 @@ caller receives typed Output
 
 | Field                              | Action                                                                |
 |------------------------------------|-----------------------------------------------------------------------|
-| `first_name` + `last_name`         | Reduce to `preferred_name` or first name + last initial               |
+| `first_name` + `last_name`         | Drop `last_name` entirely. Carry `preferred_name` if set, else `first_name`. No last initial — see "Name handling" below. |
 | `birthdate`                        | Convert to `age_years`. Birthdate never leaves the DB.                |
 | `phone`, `email`, `address`        | Drop entirely                                                         |
 | `parent_contacts`                  | Drop entirely                                                         |
@@ -121,6 +121,10 @@ caller receives typed Output
 | Member `id`                        | Replaced with a per-request opaque token; mapping kept server-side    |
 
 The combination "full name + birthdate" is a hard fail: `redact()` throws if both are present in the same record after transformation.
+
+#### Name handling
+
+We tightened the doc's earlier "first name + last initial" idea to **first name only** when the redactor implementation landed. A last initial leaks just enough information to disambiguate two members in the same quorum, which is exactly what we don't want flowing into a Claude prompt. The redactor carries `preferred_name` when set, otherwise the bare `first_name`, and never the last name in any form.
 
 ### Logging
 
@@ -137,3 +141,4 @@ Resolved scope decisions for v1. Update this list when a decision changes; do no
 - **2026-05-06 — Lesson manuals.** Seed only *Come, Follow Me* for the current year under `data/`. Aaronic Priesthood and Young Women supplements stay out of the seed corpus until `lesson_planner` ships and we know what the planner actually consumes.
 - **2026-05-06 — Photos.** No member photos in v1. The `members` table does **not** carry `photo_object_id`, and we do **not** create a Storage bucket for member photos. Reduces privacy surface area; revisit only if a leader-driven need surfaces.
 - **2026-05-06 — Auth providers.** v1 ships with Supabase Auth using magic link + Google OAuth. Church account SSO is post-v1. Auth helpers in `lib/auth/` are written provider-agnostically — `requireLeader()` and friends never branch on provider; the magic-link form and OAuth button are the only provider-aware surfaces.
+- **2026-05-06 — Redactor name policy.** The redactor (`lib/redact.ts`) carries first name only — never a last initial. This is stricter than the original prose in this doc and is now reflected in the redaction-rules table and the "Name handling" subsection above. Reasoning: a last initial is enough to disambiguate two members in the same quorum, which defeats the purpose of redacting in the first place.
