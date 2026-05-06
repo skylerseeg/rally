@@ -90,9 +90,9 @@ Youth PII (full name, birthdate, contact, parent contact, addresses, photos) **n
 
 ## Auth
 
-- Supabase Auth — email magic link to start. Church SSO is on the roadmap; design auth helpers so the provider is swappable.
+- Supabase Auth — v1 ships with email magic link **and** Google OAuth. Church account SSO is post-v1. Design auth helpers provider-agnostically; only the login UI knows which providers exist.
 - Sessions live in cookies. Server components read the user via `createServerClient` from `@supabase/ssr` (wrapped in `lib/supabase/server.ts`).
-- Role gates: `leader` (default), `presidency` (can edit unit-wide settings, manage members), `admin` (cross-unit, internal). Roles are per-unit, stored on `unit_memberships.role`.
+- Role gates: `leader` (default), `presidency` (can edit unit-wide settings, manage members), `admin` (cross-unit, internal). Roles are per-unit, stored on `unit_memberships.role`. Calling-specific titles (e.g. "Young Men 1st Counselor") go in `unit_memberships.calling_title` as freeform text — they do not gate permissions.
 - Middleware refreshes the session cookie on every request. Pages that require auth call `requireLeader()` from `lib/auth/guards.ts`.
 
 ---
@@ -127,9 +127,9 @@ Every Claude-backed feature lives in `agents/<name>/` and follows the contract i
 These are non-negotiable. A PR that violates one gets reverted.
 
 1. **Never** include a youth's full name and birthdate in the same Claude prompt. If the agent needs age, send age in years; if it needs a name, send a first name or initials.
-2. **Redact before send.** All outbound prompts pass through `lib/redact.ts`, which strips: full names → initials, phone numbers, email addresses, street addresses, parent/guardian names, photo URLs, and any free-text "notes" field unless the agent explicitly opted in via its schema.
+2. **Redact before send.** All outbound prompts pass through `lib/redact.ts`, which strips: full names → initials, phone numbers, email addresses, street addresses, parent/guardian names, and any free-text "notes" field unless the agent explicitly opted in via its schema.
 3. **Log every AI request** to `usage_events`: SHA-256 of `user_id || unit_id || day_bucket` (not the raw IDs), unit id, agent, model, token counts, redaction summary, prompt hash. Never log the prompt body.
-4. Storage objects holding member photos are private buckets with signed-URL access only. Photos are **never** sent to Claude.
+4. v1 does not store member photos. If a future version reintroduces them, photos live in a private Storage bucket with signed-URL access only and are **never** sent to Claude.
 5. Exports of member data require a `presidency` role and are written to `audit_events`.
 6. No third-party analytics, session replay, or error reporters that capture request/response bodies. Server-side error reporting is allowed if it scrubs by allowlist.
 
