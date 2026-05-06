@@ -35,3 +35,17 @@ export class AgentSchemaError extends RallyError {
 export class AgentRateLimitError extends RallyError {
   static readonly code = "AGENT_RATE_LIMIT";
 }
+
+export type RedactionErrorCode =
+  | "REDACTION_FAILED"
+  | "UNREDACTABLE_INPUT"
+  | "NAME_AND_DOB_PRESENT";
+
+export class RedactionError extends RallyError {
+  readonly code: RedactionErrorCode;
+
+  constructor(message: string, code: RedactionErrorCode) {
+    super(message);
+    this.code = code;
+  }
+}
