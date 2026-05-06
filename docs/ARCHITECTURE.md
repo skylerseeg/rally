@@ -10,8 +10,7 @@ Rally is a planning tool for LDS youth-leader presidencies — Young Men, Young 
                   │  cookies-bound Supabase client (RLS enforced)
                   ▼
               Supabase ── Postgres (domain data, usage_events, audit_events)
-                  │           Auth (magic link, future SSO)
-                  │           Storage (private buckets: member photos)
+                  │           Auth (magic link + Google OAuth; Church SSO post-v1)
                   │
                   └── workers/ (cron, queue, service-role)
                   
@@ -38,7 +37,8 @@ Joins `auth.users` to `units` with a role.
 
 ### `members`
 Youth tracked by leaders. **Not** auth users.
-- `id`, `unit_id`, `quorum_class` enum (`deacons` | `teachers` | `priests` | `beehive` | `mia_maid` | `laurel` | `sunday_school_<n>`), `first_name`, `last_name`, `preferred_name`, `birthdate`, `parent_contacts` (jsonb), `notes` (free text — never sent to agents unless schema opts in), `photo_object_id` (private bucket ref), `is_active`, `created_at`, `updated_at`.
+- `id`, `unit_id`, `quorum_class` enum (`deacons` | `teachers` | `priests` | `yw_12_13` | `yw_14_15` | `yw_16_17` | `sunday_school`), `first_name`, `last_name`, `preferred_name`, `birthdate`, `parent_contacts` (jsonb), `notes` (free text — never sent to agents unless schema opts in), `is_active`, `created_at`, `updated_at`.
+- v1 does **not** store member photos. No `photo_object_id`; no Storage bucket for member photos.
 
 ### `activities`
 A planned activity night (typically Wednesday night, but flexible).
@@ -50,14 +50,14 @@ A planned activity night (typically Wednesday night, but flexible).
 
 ### `lessons`
 Sunday lessons or quorum/class instruction.
-- `id`, `unit_id`, `quorum_class`, `taught_on` (date), `manual` enum (curriculum identifier — see "Open questions"), `manual_reference` (e.g. lesson title or section ref), `teacher_user_id`, `outline` (jsonb — produced by `lesson_planner`), `notes`.
+- `id`, `unit_id`, `quorum_class`, `taught_on` (date), `manual` enum (`come_follow_me_<year>` for v1; expand when AP/YW supplements ship), `manual_reference` (e.g. lesson title or section ref), `teacher_user_id`, `outline` (jsonb — produced by `lesson_planner`), `notes`.
 
 ### `usage_events`
 One row per Claude call. Required, not optional.
 - `id`, `unit_id`, `agent_name`, `model`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens`, `latency_ms`, `request_hash`, `user_hash` (SHA-256 of `user_id || unit_id || day_bucket`), `redaction_summary` (jsonb: counts of names/phones/emails/addresses stripped), `error_code` nullable, `created_at`.
 
 ### `audit_events`
-Cross-cutting log for sensitive actions: member exports, role changes, membership changes, photo access.
+Cross-cutting log for sensitive actions: member exports, role changes, membership changes.
 - `id`, `unit_id`, `actor_user_id`, `action`, `target_table`, `target_id`, `metadata` (jsonb), `created_at`.
 
 ### `agent_suggestions`
@@ -118,7 +118,6 @@ caller receives typed Output
 | `phone`, `email`, `address`        | Drop entirely                                                         |
 | `parent_contacts`                  | Drop entirely                                                         |
 | `notes` free text                  | Drop unless the agent's `InputSchema` opts in (`includeNotes: true`) and even then run a regex pass to strip phone/email/address/full-name patterns |
-| `photo_object_id`, photo URLs      | Drop entirely. Photos never go to Claude.                             |
 | Member `id`                        | Replaced with a per-request opaque token; mapping kept server-side    |
 
 The combination "full name + birthdate" is a hard fail: `redact()` throws if both are present in the same record after transformation.
@@ -129,10 +128,12 @@ The combination "full name + birthdate" is a hard fail: `redact()` throws if bot
 
 ---
 
-## Open Questions (need owner input)
+## Decisions Log
 
-- Exact role taxonomy: confirm `leader` vs `presidency` is the right split, or whether we want separate `advisor`, `secretary`, `president` roles.
-- Quorum/class enum: confirm the set above and whether Sunday School classes need finer granularity than `sunday_school_<n>`.
-- Which lesson manuals to seed in `data/` for v1: *Come, Follow Me* (current year), Aaronic Priesthood/Young Women supplements, or a narrower set?
-- Photo handling: confirm we want photos at all in v1, given the privacy posture.
-- SSO: timeline for Church account integration — affects whether we invest in the magic-link flow polish now.
+Resolved scope decisions for v1. Update this list when a decision changes; do not delete entries — supersede them with a newer dated entry below.
+
+- **2026-05-06 — Role taxonomy.** Keep three roles: `leader | presidency | admin`. Calling-specific titles ("Young Men 1st Counselor", "Beehive Advisor", "Sunday School Secretary") are stored in `unit_memberships.calling_title` as freeform text. We do **not** model `advisor`, `secretary`, or `president` as separate roles.
+- **2026-05-06 — Quorum/class enum.** Final v1 set: `deacons | teachers | priests | yw_12_13 | yw_14_15 | yw_16_17 | sunday_school`. Sunday School is a single value for v1 — no per-class numbering. Revisit if a unit needs to plan multiple SS classes independently.
+- **2026-05-06 — Lesson manuals.** Seed only *Come, Follow Me* for the current year under `data/`. Aaronic Priesthood and Young Women supplements stay out of the seed corpus until `lesson_planner` ships and we know what the planner actually consumes.
+- **2026-05-06 — Photos.** No member photos in v1. The `members` table does **not** carry `photo_object_id`, and we do **not** create a Storage bucket for member photos. Reduces privacy surface area; revisit only if a leader-driven need surfaces.
+- **2026-05-06 — Auth providers.** v1 ships with Supabase Auth using magic link + Google OAuth. Church account SSO is post-v1. Auth helpers in `lib/auth/` are written provider-agnostically — `requireLeader()` and friends never branch on provider; the magic-link form and OAuth button are the only provider-aware surfaces.
