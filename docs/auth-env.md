@@ -3,10 +3,12 @@
 ## Auth flow
 
 1. Leader visits a protected route. Middleware (`middleware.ts`) checks the Supabase session cookie and refreshes it.
-2. Unauthenticated → redirect to `/login` (magic-link form).
-3. After magic link, Supabase sets the session cookie. Server components read the user via `createServerClient` from `lib/supabase/server.ts`.
-4. `requireLeader()` in `lib/auth/guards.ts` returns the authenticated user + their `unit_memberships`. It throws if the user has no memberships.
+2. Unauthenticated → redirect to `/login`. The login page offers two providers for v1: email magic link and Google OAuth.
+3. After successful sign-in, Supabase sets the session cookie. Server components read the user via `createServerClient` from `lib/supabase/server.ts`.
+4. `requireLeader()` in `lib/auth/guards.ts` returns the authenticated user + their `unit_memberships`. It throws if the user has no memberships. The guard is provider-agnostic — only the login UI knows which providers exist.
 5. `requireUnitAccess(unitId, role?)` enforces per-unit role requirements (`leader` < `presidency` < `admin`).
+
+Church account SSO is post-v1. When it lands, it plugs in as an additional provider with no changes to the guards.
 
 ## Roles
 
