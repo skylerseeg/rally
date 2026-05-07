@@ -3,7 +3,7 @@
 // Display helpers. Pure functions, no DB or auth state. Server- and
 // client-safe.
 
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 
 import type { Database } from "@/supabase/types";
 
@@ -115,4 +115,89 @@ export function formatDate(
     case "weekday":
       return format(d, "EEEE");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Activities — date helpers
+// ---------------------------------------------------------------------------
+
+export function formatActivityDate(starts_at: string | Date): string {
+  const d = typeof starts_at === "string" ? new Date(starts_at) : starts_at;
+  return format(d, "EEE, MMM d · h:mm a");
+}
+
+export function formatActivityDateRange(
+  starts_at: string | Date,
+  ends_at: string | Date | null,
+): string {
+  const s = typeof starts_at === "string" ? new Date(starts_at) : starts_at;
+  if (!ends_at) return formatActivityDate(s);
+  const e = typeof ends_at === "string" ? new Date(ends_at) : ends_at;
+  // Same day → "Wed, Nov 13 · 7:00–8:30 PM"; different days → full ranges.
+  const sameDay =
+    s.getFullYear() === e.getFullYear() &&
+    s.getMonth() === e.getMonth() &&
+    s.getDate() === e.getDate();
+  if (sameDay) {
+    return `${format(s, "EEE, MMM d")} · ${format(s, "h:mm")}–${format(e, "h:mm a")}`;
+  }
+  return `${format(s, "EEE, MMM d, h:mm a")} → ${format(e, "EEE, MMM d, h:mm a")}`;
+}
+
+// Sunday-anchored week (LDS convention: Sunday is the first day).
+export function startOfWeek(d: Date): Date {
+  const result = new Date(d);
+  result.setHours(0, 0, 0, 0);
+  const day = result.getDay(); // 0 = Sunday
+  result.setDate(result.getDate() - day);
+  return result;
+}
+
+export function endOfWeek(d: Date): Date {
+  const start = startOfWeek(d);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7); // exclusive upper bound
+  return end;
+}
+
+export function formatWeekRange(start: Date): string {
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const sameMonth = start.getMonth() === end.getMonth();
+  if (sameMonth) {
+    return `${format(start, "MMM d")}–${format(end, "d, yyyy")}`;
+  }
+  return `${format(start, "MMM d")}–${format(end, "MMM d, yyyy")}`;
+}
+
+// ISO 'YYYY-MM-DD' for the Sunday of the given date's week (URL-safe).
+export function isoSunday(d: Date): string {
+  const s = startOfWeek(d);
+  return format(s, "yyyy-MM-dd");
+}
+
+// 'YYYY-MM-DD' → Date at local midnight.
+export function fromIsoDate(value: string): Date {
+  const [y, m, d] = value.split("-").map((n) => parseInt(n, 10));
+  return new Date(y!, (m! - 1), d!);
+}
+
+// ISO timestamp → 'YYYY-MM-DDTHH:mm' for <input type="datetime-local">.
+export function toDateTimeLocalInput(iso: string | Date): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+// 'YYYY-MM-DDTHH:mm' (local) → ISO string with the local tz baked in.
+export function fromDateTimeLocalInput(value: string): string {
+  return new Date(value).toISOString();
+}
+
+export function formatRelativeTime(date: string | Date): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return formatDistanceToNow(d, { addSuffix: true });
 }
