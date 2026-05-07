@@ -390,9 +390,62 @@ export type Database = {
         };
         Relationships: [];
       };
+      invitations: {
+        Row: {
+          id: string;
+          unit_id: string;
+          email: string;
+          role: Database["public"]["Enums"]["unit_membership_role"];
+          calling_title: string | null;
+          invited_by: string;
+          expires_at: string;
+          accepted_at: string | null;
+          accepted_by: string | null;
+          revoked_at: string | null;
+          revoked_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          unit_id: string;
+          email: string;
+          role: Database["public"]["Enums"]["unit_membership_role"];
+          calling_title?: string | null;
+          invited_by: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          unit_id?: string;
+          email?: string;
+          role?: Database["public"]["Enums"]["unit_membership_role"];
+          calling_title?: string | null;
+          invited_by?: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      accept_pending_invitations: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+    };
     Enums: {
       unit_membership_role: "leader" | "presidency" | "admin";
       quorum_class:

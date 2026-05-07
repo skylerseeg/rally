@@ -20,16 +20,28 @@ type Props = {
   children: ReactNode;
 };
 
-const NAV_ITEMS: Array<{ href: string; label: string }> = [
+type NavItem = {
+  href: string;
+  label: string;
+  presidencyOnly?: boolean;
+};
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard" },
   { href: "/members", label: "Members" },
   { href: "/activities", label: "Activities" },
   { href: "/lessons", label: "Lessons" },
   { href: "/presidency", label: "Presidency" },
+  { href: "/presidency/invitations", label: "Invitations", presidencyOnly: true },
 ];
 
 export function AppShell({ user, memberships, activeUnit, children }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isPresidency =
+    activeUnit.role === "presidency" || activeUnit.role === "admin";
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => !item.presidencyOnly || isPresidency,
+  );
 
   // Close mobile menu on Escape.
   useEffect(() => {
@@ -54,7 +66,7 @@ export function AppShell({ user, memberships, activeUnit, children }: Props) {
 
           <div className="hidden flex-1 items-center justify-center md:flex">
             <div className="flex items-center gap-1">
-              {NAV_ITEMS.map((item) => (
+              {visibleNavItems.map((item) => (
                 <NavLink key={item.href} href={item.href}>
                   {item.label}
                 </NavLink>
@@ -87,7 +99,7 @@ export function AppShell({ user, memberships, activeUnit, children }: Props) {
         {mobileOpen ? (
           <div className="border-t border-slate-800 bg-slate-900 md:hidden">
             <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-3">
-              {NAV_ITEMS.map((item) => (
+              {visibleNavItems.map((item) => (
                 <NavLink
                   key={item.href}
                   href={item.href}
