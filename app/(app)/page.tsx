@@ -9,10 +9,13 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getActiveUnit } from "@/lib/auth/units";
 import { createClient } from "@/lib/supabase/server";
-import { formatActivityCategory, formatDate, formatUnitName } from "@/lib/format";
+import {
+  formatActivityCategory,
+  formatDate,
+  formatRelativeTime,
+  formatUnitName,
+} from "@/lib/format";
 import { log } from "@/lib/log";
-
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 type StatCardProps = {
   label: string;
@@ -22,8 +25,8 @@ type StatCardProps = {
 };
 
 function StatCard({ label, value, href, emptyHint }: StatCardProps) {
-  const isZero = value === 0 || value === "—";
-  const display = isZero && emptyHint ? emptyHint : value;
+  const isEmpty = value === 0 || value === "—";
+  const display = isEmpty && emptyHint ? emptyHint : value;
 
   const inner = (
     <Card className="flex flex-col gap-2">
@@ -32,7 +35,7 @@ function StatCard({ label, value, href, emptyHint }: StatCardProps) {
       </div>
       <div
         className={
-          isZero && emptyHint
+          isEmpty && emptyHint
             ? "text-sm text-slate-500"
             : "text-3xl font-semibold tracking-tight text-slate-900"
         }
@@ -62,7 +65,6 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const unitId = active.unit.id;
   const now = new Date();
-  const thirtyDaysOut = new Date(now.getTime() + THIRTY_DAYS_MS);
 
   // Active members count.
   const { count: membersCount, error: membersError } = await supabase
@@ -71,47 +73,34 @@ export default async function DashboardPage() {
     .eq("unit_id", unitId)
     .eq("is_active", true);
   if (membersError) {
-    log.warn({ event: "dashboard_members_count_failed", reason: membersError.message });
+    log.warn({
+      event: "dashboard_members_count_failed",
+      reason: membersError.message,
+    });
   }
 
-  // Upcoming activities (next 30 days).
+  // Upcoming activities (anything in the future).
   const { count: upcomingCount, error: upcomingError } = await supabase
     .from("activities")
     .select("*", { count: "exact", head: true })
     .eq("unit_id", unitId)
-    .gte("starts_at", now.toISOString())
-    .lt("starts_at", thirtyDaysOut.toISOString());
+    .gte("starts_at", now.toISOString());
   if (upcomingError) {
-    log.warn({ event: "dashboard_upcoming_count_failed", reason: upcomingError.message });
+    log.warn({
+      event: "dashboard_upcoming_count_failed",
+      reason: upcomingError.message,
+    });
   }
 
-  // Most recent past activity (for attendance metric).
-  const { data: lastActivityRows, error: lastActivityError } = await supabase
-    .from("activities")
-    .select("id, title, starts_at")
+  // Last attendance: most recent recorded_at across all activities for
+  // this unit. The link drops the leader straight into that activity.
+  const { data: lastAttendanceRows } = await supabase
+    .from("attendance")
+    .select("activity_id, recorded_at")
     .eq("unit_id", unitId)
-    .lt("starts_at", now.toISOString())
-    .order("starts_at", { ascending: false })
+    .order("recorded_at", { ascending: false })
     .limit(1);
-  if (lastActivityError) {
-    log.warn({ event: "dashboard_last_activity_failed", reason: lastActivityError.message });
-  }
-  const lastActivity = lastActivityRows?.[0];
-
-  let attendanceLabel: string = "—";
-  let attendanceHint: string | undefined = "No past activities yet.";
-  if (lastActivity && membersCount && membersCount > 0) {
-    const { count: presentCount } = await supabase
-      .from("attendance")
-      .select("*", { count: "exact", head: true })
-      .eq("activity_id", lastActivity.id)
-      .eq("status", "present");
-    if (presentCount !== null && presentCount !== undefined) {
-      const pct = Math.round((presentCount / membersCount) * 100);
-      attendanceLabel = `${pct}%`;
-      attendanceHint = undefined;
-    }
-  }
+  const lastAttendance = lastAttendanceRows?.[0];
 
   // Next upcoming activity (for the panel below).
   const { data: nextActivityRows } = await supabase
@@ -129,9 +118,7 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
           Dashboard
         </h1>
-        <p className="text-sm text-slate-600">
-          {formatUnitName(active.unit)}
-        </p>
+        <p className="text-sm text-slate-600">{formatUnitName(active.unit)}</p>
       </header>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -142,16 +129,20 @@ export default async function DashboardPage() {
           emptyHint="No members yet."
         />
         <StatCard
-          label="Upcoming · next 30 days"
+          label="Upcoming activities"
           value={upcomingCount ?? 0}
           href="/activities"
           emptyHint="No activities scheduled."
         />
         <StatCard
-          label="Last activity attendance"
-          value={attendanceLabel}
-          href="/activities"
-          emptyHint={attendanceHint}
+          label="Last attendance"
+          value={
+            lastAttendance ? formatRelativeTime(lastAttendance.recorded_at) : "—"
+          }
+          href={
+            lastAttendance ? `/activities/${lastAttendance.activity_id}` : undefined
+          }
+          emptyHint="No attendance recorded yet."
         />
         <StatCard
           label="Open action items"
@@ -166,27 +157,37 @@ export default async function DashboardPage() {
           Next activity
         </h2>
         {nextActivity ? (
-          <Card className="flex flex-col gap-2">
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-base font-semibold text-slate-900">
-                {nextActivity.title}
-              </h3>
-              <span className="text-xs font-medium text-slate-500">
-                {formatActivityCategory(nextActivity.category)}
-              </span>
-            </div>
-            <p className="text-sm text-slate-600">
-              {formatDate(nextActivity.starts_at, "long")} ·{" "}
-              {formatDate(nextActivity.starts_at, "time")}
-            </p>
-            {nextActivity.location ? (
-              <p className="text-sm text-slate-500">{nextActivity.location}</p>
-            ) : null}
-          </Card>
+          <Link
+            href={`/activities/${nextActivity.id}`}
+            className="block"
+          >
+            <Card className="flex flex-col gap-2 transition-shadow hover:shadow-md">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-base font-semibold text-slate-900">
+                  {nextActivity.title}
+                </h3>
+                <span className="text-xs font-medium text-slate-500">
+                  {formatActivityCategory(nextActivity.category)}
+                </span>
+              </div>
+              <p className="text-sm text-slate-600">
+                {formatDate(nextActivity.starts_at, "long")} ·{" "}
+                {formatDate(nextActivity.starts_at, "time")}
+              </p>
+              {nextActivity.location ? (
+                <p className="text-sm text-slate-500">{nextActivity.location}</p>
+              ) : null}
+            </Card>
+          </Link>
         ) : (
           <EmptyState
             title="No upcoming activities"
             description="Plan one when you're ready — they'll show up here."
+            action={
+              <Link href="/activities/new" className="text-sm font-medium text-slate-700 underline">
+                Plan an activity
+              </Link>
+            }
           />
         )}
       </section>
