@@ -3,13 +3,27 @@
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth/guards";
+import { log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function NoAccessPage() {
   const user = await requireUser();
+  const supabase = await createClient();
+
+  // Pull pending invitations for this user's email. The RPC is
+  // idempotent — safe to call on every render of this page. Handles
+  // the case where a leader was invited *after* their first failed
+  // sign-in: they reload, memberships materialise, and we redirect.
+  const { error: rpcError } = await supabase.rpc("accept_pending_invitations");
+  if (rpcError) {
+    log.error({
+      event: "accept_pending_invitations_failed",
+      where: "no_access_page",
+      reason: rpcError.message,
+    });
+  }
 
   // If the user actually has memberships, they shouldn't be here.
-  const supabase = await createClient();
   const { data: memberships } = await supabase
     .from("unit_memberships")
     .select("id")
