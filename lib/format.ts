@@ -49,7 +49,9 @@ export function formatQuorumClass(qc: QuorumClass): string {
   return QUORUM_CLASS_LABELS[qc];
 }
 
-export function formatMemberName(member: Member): string {
+export function formatMemberName(
+  member: Pick<Member, "first_name" | "last_name" | "preferred_name">,
+): string {
   if (member.preferred_name && member.preferred_name.trim().length > 0) {
     return member.preferred_name;
   }
@@ -57,6 +59,28 @@ export function formatMemberName(member: Member): string {
     ? `${member.last_name.charAt(0).toUpperCase()}.`
     : "";
   return lastInitial ? `${member.first_name} ${lastInitial}` : member.first_name;
+}
+
+export function formatMemberFullName(
+  member: Pick<Member, "first_name" | "last_name" | "preferred_name">,
+): string {
+  // Internal-only: returns the full first + last (or preferred + last) for
+  // staff-facing screens. Never use this for outbound prompts — call
+  // redactMember() instead.
+  const first =
+    member.preferred_name && member.preferred_name.trim().length > 0
+      ? member.preferred_name
+      : member.first_name;
+  return member.last_name ? `${first} ${member.last_name}` : first;
+}
+
+export function formatAge(birthdate: string | Date, now: Date = new Date()): number {
+  const d = typeof birthdate === "string" ? new Date(birthdate) : birthdate;
+  if (Number.isNaN(d.getTime())) return 0;
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
 }
 
 export function formatCallingTitle(
