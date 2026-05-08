@@ -157,3 +157,10 @@ Resolved scope decisions for v1. Update this list when a decision changes; do no
 - **2026-05-06 — Redactor name policy.** The redactor (`lib/redact.ts`) carries first name only — never a last initial. This is stricter than the original prose in this doc and is now reflected in the redaction-rules table and the "Name handling" subsection above. Reasoning: a last initial is enough to disambiguate two members in the same quorum, which defeats the purpose of redacting in the first place.
 - **Onboarding gap (2026-05-07):** New leaders cannot self-onboard. A `unit_memberships` row must be inserted manually via SQL after first sign-in. Invitations flow is prioritized immediately after P8 (Activities + Attendance) — before any agents. Bumped from P16 to P-next.
 - **Anthropic foundation (2026-05-07):** Agents call into `lib/anthropic/withUsage`, never `@anthropic-ai/sdk` directly. Models are tiered (`cheap` / `default` / `deep`) and resolved in `lib/anthropic/models.ts`. Usage events are logged with a per-day-bucketed SHA-256 hash of `(user_id, unit_id, day, RALLY_USAGE_HASH_SALT)` — never the raw user id. The admin (service-role) Supabase client is used for `usage_events` writes; this is the explicit exception to the "service role only in workers/ and api/admin/" rule, documented because `lib/anthropic/` is treated as worker-side infrastructure.
+- **Usage events allow null unit (2026-05-08):** `usage_events.unit_id` was
+  `NOT NULL` and `withUsage` silently skipped logging when callers passed
+  `unitId: null`. This produced accounting blind spots for system-level calls
+  (batch jobs, smoke tests, ops). Migration 0003 drops the constraint;
+  `withUsage` now logs every Anthropic call unconditionally. Application-level
+  callers must still pass a real unit_id when one exists; null is reserved
+  for genuinely unscoped operations.
