@@ -83,6 +83,19 @@ All agents live under `agents/`. Each has its own directory and follows the cont
 
 ---
 
+## AI calls and accounting
+
+Every Claude call routes through `lib/anthropic/withUsage`. The wrapper does four things every time:
+
+1. **Tier → model** via `lib/anthropic/models.ts`. Agents request a tier (`cheap` / `default` / `deep`); the registry maps to the concrete model string. Update model IDs in one place, never grep across `agents/`.
+2. **Calls the SDK** with our defaults (`max_tokens: 1024`, `temperature: 0.7`) and any `tools` / `tool_choice` the caller passes for forced structured output.
+3. **Hashes the request body** (SHA-256 over `system + messages + tools + tool_choice + maxTokens + temperature + model`) and stores the hash in `usage_events.request_hash`. The body itself is never persisted.
+4. **Hashes the user identity** (SHA-256 of `user_id || unit_id || day_bucket || RALLY_USAGE_HASH_SALT`) and stores the hash in `usage_events.user_hash` along with token counts, latency, and `error_code` (null on success).
+
+**The redaction expectation is on the caller.** `withUsage` does not call `lib/redact.ts` — it cannot know what the agent considers safe. Each agent runs `redactMember` (or whatever shape applies) before constructing `messages`. Tests in `lib/redact.test.ts` enforce the dropping rules; this layer enforces logging.
+
+**Cost analytics** live in `usage_events`. There's no UI yet — query directly via Studio / SQL Editor for now. A future prompt will surface per-agent cost per day in the presidency dashboard.
+
 ## Privacy / Redaction Pipeline
 
 The pipeline that sits between any server-side caller and Anthropic:
@@ -143,3 +156,4 @@ Resolved scope decisions for v1. Update this list when a decision changes; do no
 - **2026-05-06 — Auth providers.** v1 ships with Supabase Auth using magic link + Google OAuth. Church account SSO is post-v1. Auth helpers in `lib/auth/` are written provider-agnostically — `requireLeader()` and friends never branch on provider; the magic-link form and OAuth button are the only provider-aware surfaces.
 - **2026-05-06 — Redactor name policy.** The redactor (`lib/redact.ts`) carries first name only — never a last initial. This is stricter than the original prose in this doc and is now reflected in the redaction-rules table and the "Name handling" subsection above. Reasoning: a last initial is enough to disambiguate two members in the same quorum, which defeats the purpose of redacting in the first place.
 - **Onboarding gap (2026-05-07):** New leaders cannot self-onboard. A `unit_memberships` row must be inserted manually via SQL after first sign-in. Invitations flow is prioritized immediately after P8 (Activities + Attendance) — before any agents. Bumped from P16 to P-next.
+- **Anthropic foundation (2026-05-07):** Agents call into `lib/anthropic/withUsage`, never `@anthropic-ai/sdk` directly. Models are tiered (`cheap` / `default` / `deep`) and resolved in `lib/anthropic/models.ts`. Usage events are logged with a per-day-bucketed SHA-256 hash of `(user_id, unit_id, day, RALLY_USAGE_HASH_SALT)` — never the raw user id. The admin (service-role) Supabase client is used for `usage_events` writes; this is the explicit exception to the "service role only in workers/ and api/admin/" rule, documented because `lib/anthropic/` is treated as worker-side infrastructure.
