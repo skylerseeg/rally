@@ -82,4 +82,7 @@ Thumbs.db
 .turbo/
 .cache/
 .parcel-cache/
-scratch/
+
+# Local scratch files for ad-hoc smoke tests and one-off scripts.
+# Anything here is ephemeral and should never be committed.
+/scratch/
