@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { suggesterOutputSchema, suggestActivitiesTool } from '../schema'
+import {
+  suggesterOutputSchema,
+  suggestActivitiesTool,
+  activityCategorySchema,
+  activityCategoryValues,
+} from '../schema'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -8,7 +13,7 @@ import { suggesterOutputSchema, suggestActivitiesTool } from '../schema'
 function makeSuggestion(overrides: Record<string, unknown> = {}) {
   return {
     title: 'Capture the flag at the church field',
-    kind: 'weekly',
+    category: 'physical',
     description: 'Classic team game with glow sticks after dark. Low cost, high energy.',
     prep_checklist: ['Buy glow sticks', 'Mark the field boundary'],
     supply_list: ['Glow sticks', 'Two flags', 'Cones'],
@@ -69,6 +74,34 @@ describe('suggesterOutputSchema', () => {
     const result = suggesterOutputSchema.safeParse(payload)
     expect(result.success).toBe(false)
   })
+
+  it('rejects category: "weekly" (old vocabulary rejected)', () => {
+    const payload = makeValidPayload(3)
+    payload.suggestions[0] = makeSuggestion({ category: 'weekly' }) as ReturnType<
+      typeof makeSuggestion
+    >
+    const result = suggesterOutputSchema.safeParse(payload)
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('activityCategorySchema', () => {
+  it.each(activityCategoryValues)('parses "%s" as a valid category', (value) => {
+    const result = activityCategorySchema.safeParse(value)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects old value "outing"', () => {
+    expect(activityCategorySchema.safeParse('outing').success).toBe(false)
+  })
+
+  it('rejects old value "activity"', () => {
+    expect(activityCategorySchema.safeParse('activity').success).toBe(false)
+  })
+
+  it('rejects old value "weekly"', () => {
+    expect(activityCategorySchema.safeParse('weekly').success).toBe(false)
+  })
 })
 
 describe('suggestActivitiesTool', () => {
@@ -76,5 +109,18 @@ describe('suggestActivitiesTool', () => {
     const required = suggestActivitiesTool.input_schema.required
     expect(required).toContain('suggestions')
     expect(required).toContain('rationale')
+  })
+
+  it('item required fields include "category" not "kind"', () => {
+    const itemRequired =
+      suggestActivitiesTool.input_schema.properties.suggestions.items.required
+    expect(itemRequired).toContain('category')
+    expect(itemRequired).not.toContain('kind')
+  })
+
+  it('category enum in tool schema contains DB values', () => {
+    const categoryEnum =
+      suggestActivitiesTool.input_schema.properties.suggestions.items.properties.category.enum
+    expect(categoryEnum).toEqual(expect.arrayContaining(['spiritual', 'service', 'social', 'physical', 'skill']))
   })
 })

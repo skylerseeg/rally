@@ -77,6 +77,9 @@ export async function runActivitySuggester(
   return { output: parsed.data, usage: result.usage }
 }
 
+// TODO: Re-categorize data/activity_ideas.json entries to use activity_category
+// values (spiritual | service | social | physical | skill) in a future pass.
+// Currently the seed catalog uses a different taxonomy; only titles are used here.
 function pickIdeaSeeds(count: number, exclude: string[]): string[] {
   const excludeSet = new Set(exclude.map((s) => s.toLowerCase().trim()))
   const eligible = ideaCatalog.ideas.filter(

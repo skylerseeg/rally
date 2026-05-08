@@ -15,7 +15,7 @@ export type SuggesterContextInput = {
   members: Member[]
   recent_activities: Array<{
     title: string
-    kind: string
+    category: string
     starts_at: string
     attendance_summary: { present: number; absent: number; excused: number } | null
   }>
@@ -40,7 +40,7 @@ export type RedactedContext = {
   }
   recent_activities: Array<{
     title: string
-    kind: string
+    category: string
     weeks_ago: number
     attendance_rate: number | null
   }>
@@ -76,7 +76,7 @@ export function redactForSuggester(input: SuggesterContextInput): RedactedContex
       const total = summary ? summary.present + summary.absent + summary.excused : 0
       return {
         title: a.title,
-        kind: a.kind,
+        category: a.category,
         weeks_ago: weeksAgo,
         attendance_rate: total > 0 ? summary!.present / total : null,
       }
