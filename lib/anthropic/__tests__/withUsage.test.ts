@@ -225,3 +225,42 @@ describe("withUsage — non-fatal logging failure", () => {
     expect(result.toolInput).toEqual({ foo: "bar" });
   });
 });
+
+describe("withUsage — null unitId (system-level calls)", () => {
+  it("writes the usage_events row with unit_id: null and returns response", async () => {
+    messagesCreateMock.mockResolvedValueOnce(fakeMessage());
+
+    const result = await withUsage<{ foo: string }>(
+      makeInput({ context: { userId: "00000000-0000-0000-0000-000000000001", unitId: null } }),
+    );
+
+    expect(result.toolInput).toEqual({ foo: "bar" });
+    expect(fromMock).toHaveBeenCalledWith("usage_events");
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    const row = insertMock.mock.calls[0]![0];
+    expect(row).toMatchObject({
+      unit_id: null,
+      agent_name: "test_agent",
+      error_code: null,
+    });
+    expect(row.user_hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("writes the usage_events row with error_code set when the API throws with unitId: null", async () => {
+    const err = Object.assign(new Error("overloaded"), { status: 429 });
+    messagesCreateMock.mockRejectedValueOnce(err);
+
+    await expect(
+      withUsage(
+        makeInput({ context: { userId: "00000000-0000-0000-0000-000000000001", unitId: null } }),
+      ),
+    ).rejects.toThrow("overloaded");
+
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    const row = insertMock.mock.calls[0]![0];
+    expect(row.unit_id).toBeNull();
+    expect(row.error_code).toBe("rate_limit");
+    expect(row.input_tokens).toBe(0);
+    expect(row.output_tokens).toBe(0);
+  });
+});

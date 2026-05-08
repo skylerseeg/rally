@@ -44,12 +44,10 @@ export type AgentCallInput = {
   /** Sampling. Default 0.7 for planning; lower for extraction. */
   temperature?: number;
   /**
-   * Required for usage accounting. unitId currently must be a real unit
-   * id — the usage_events.unit_id column is NOT NULL with an FK to
-   * units. When null, the usage row is skipped (and a warn line is
-   * logged). System-level calls without a unit context will need a
-   * follow-up migration to relax that constraint or a "system" unit
-   * sentinel row.
+   * Required for usage accounting. unitId is null for system-level calls
+   * (batch jobs, smoke tests, ops tooling). Application-level callers
+   * (server actions, agent invocations from a request context) MUST pass
+   * the active unit_id; null is reserved for genuinely unscoped operations.
    */
   context: {
     userId: string;

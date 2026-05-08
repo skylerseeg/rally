@@ -4,10 +4,9 @@
 // this; they never import @anthropic-ai/sdk directly.
 //
 // Schema notes (verified against migration 0001_initial_schema):
-//   * usage_events.unit_id is NOT NULL with an FK to units. When the
-//     caller passes context.unitId === null we SKIP the insert and
-//     emit a warn line — until we add a "system" sentinel unit or
-//     loosen the constraint, we can't log calls without a unit.
+//   * usage_events.unit_id is nullable (migration 0003 dropped NOT NULL).
+//     Rows are always written; null unit_id means a system-level call
+//     (batch job, smoke test, ops tooling).
 //   * request_hash is NOT NULL: we store SHA-256 of the prompt body,
 //     never the body itself.
 //   * redaction_summary is NOT NULL with default '{}'; we omit it from
@@ -127,14 +126,6 @@ async function writeUsageEvent(args: {
   latencyMs: number;
   errorCode: string | null;
 }): Promise<void> {
-  if (args.unitId === null) {
-    log.warn({
-      event: "usage_event_skipped_no_unit",
-      agent: args.agentName,
-    });
-    return;
-  }
-
   const userHash = hashUserIdentity({
     userId: args.userId,
     unitId: args.unitId,
@@ -150,8 +141,12 @@ async function writeUsageEvent(args: {
   //      lib/anthropic/ is treated as worker-side infrastructure
   //      (documented in the Decisions Log).
   const supabase = createAdminClient();
+  // unit_id is intentionally null for system-level calls. The generated types
+  // still reflect the old NOT NULL constraint; migration 0003 drops it and
+  // types.ts will be regenerated after the migration runs in CI.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- reason: generated types lag the migration
   const { error } = await supabase.from("usage_events").insert({
-    unit_id: args.unitId,
+    unit_id: args.unitId as any, // reason: column is nullable post-migration 0003; types regenerated in CI
     user_hash: userHash,
     agent_name: args.agentName,
     model: args.model,
