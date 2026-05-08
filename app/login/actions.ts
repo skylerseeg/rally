@@ -18,6 +18,16 @@ function buildOrigin(host: string | null, proto: string | null): string {
   return `${safeProto}://${safeHost}`;
 }
 
+async function callbackOrigin(): Promise<string> {
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  const h = await headers();
+  return buildOrigin(
+    h.get("x-forwarded-host") ?? h.get("host"),
+    h.get("x-forwarded-proto"),
+  );
+}
+
 export async function signInWithMagicLink(formData: FormData): Promise<void> {
   const raw = { email: formData.get("email") };
   const parsed = SignInSchema.safeParse(raw);
@@ -26,11 +36,7 @@ export async function signInWithMagicLink(formData: FormData): Promise<void> {
   }
   const { email } = parsed.data;
 
-  const h = await headers();
-  const origin = buildOrigin(
-    h.get("x-forwarded-host") ?? h.get("host"),
-    h.get("x-forwarded-proto"),
-  );
+  const origin = await callbackOrigin();
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
@@ -46,4 +52,36 @@ export async function signInWithMagicLink(formData: FormData): Promise<void> {
   }
 
   redirect(`/login?sent=true&email=${encodeURIComponent(email)}`);
+}
+
+export async function signInWithGoogle(): Promise<void> {
+  const origin = await callbackOrigin();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${origin}/auth/callback`,
+      // Force Google to show the account chooser. Avoids silent
+      // re-auth into a wrong account when leaders share devices.
+      queryParams: { prompt: "select_account" },
+    },
+  });
+
+  if (error || !data?.url) {
+    log.warn({
+      event: "oauth_init_failed",
+      provider: "google",
+      reason: error?.message ?? "no_url_returned",
+    });
+    redirect(
+      `/login?error=${encodeURIComponent(
+        error?.message ?? "Could not start Google sign-in.",
+      )}`,
+    );
+  }
+
+  // Hand the browser off to Google's consent screen. Google will redirect
+  // back to <origin>/auth/callback?code=... when done.
+  redirect(data.url);
 }
