@@ -1,11 +1,20 @@
 import { z } from 'zod'
 
-// Note: the DB `activity_category` enum uses spiritual|service|social|physical|skill.
-// These agent `kind` values are internal to the suggestion layer and are not
-// stored directly — the caller maps them when creating a draft activity row.
+// Match the activity_category enum in supabase/migrations — do not add values here.
+export const activityCategoryValues = [
+  'spiritual',
+  'service',
+  'social',
+  'physical',
+  'skill',
+] as const
+
+export const activityCategorySchema = z.enum(activityCategoryValues)
+export type ActivityCategory = z.infer<typeof activityCategorySchema>
+
 export const suggestionSchema = z.object({
   title: z.string().trim().min(3).max(120),
-  kind: z.enum(['weekly', 'service', 'activity', 'outing', 'other']),
+  category: activityCategorySchema,
   description: z.string().trim().min(20).max(800),
   prep_checklist: z.array(z.string().trim().min(3).max(280)).max(8).default([]),
   supply_list: z.array(z.string().trim().min(2).max(200)).max(12).default([]),
@@ -27,7 +36,8 @@ export const suggestActivitiesTool = {
   name: 'suggest_activities',
   description:
     'Return 3–7 activity suggestions tailored to the quorum context provided. ' +
-    'Prefer variety across kinds. Lean low-cost. Do not repeat anything from the recent_activities list.',
+    'Aim for a mix across categories (spiritual, service, social, physical, skill). ' +
+    'Lean low-cost. Do not repeat anything from the recent_activities list.',
   input_schema: {
     type: 'object',
     properties: {
@@ -39,7 +49,7 @@ export const suggestActivitiesTool = {
           type: 'object',
           properties: {
             title: { type: 'string' },
-            kind: { type: 'string', enum: ['weekly', 'service', 'activity', 'outing', 'other'] },
+            category: { type: 'string', enum: [...activityCategoryValues] },
             description: { type: 'string' },
             prep_checklist: { type: 'array', items: { type: 'string' }, maxItems: 8 },
             supply_list: { type: 'array', items: { type: 'string' }, maxItems: 12 },
@@ -48,7 +58,7 @@ export const suggestActivitiesTool = {
             estimated_cost_usd: { type: 'integer', minimum: 0, maximum: 500 },
             duration_minutes: { type: 'integer', minimum: 15, maximum: 480 },
           },
-          required: ['title', 'kind', 'description', 'estimated_cost_usd', 'duration_minutes'],
+          required: ['title', 'category', 'description', 'estimated_cost_usd', 'duration_minutes'],
         },
       },
       rationale: { type: 'string' },

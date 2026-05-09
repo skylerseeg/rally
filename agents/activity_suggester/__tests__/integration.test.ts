@@ -44,35 +44,35 @@ function makeValidToolInput() {
     suggestions: [
       {
         title: 'Capture the flag at the church field',
-        kind: 'weekly',
+        category: 'physical',
         description: 'Classic team game with glow sticks after dark. Low cost, high energy for the whole quorum.',
         estimated_cost_usd: 10,
         duration_minutes: 60,
       },
       {
         title: 'Yard cleanup service project',
-        kind: 'service',
+        category: 'service',
         description: 'Rake leaves and tidy up the yard of an elderly ward member. Simple supplies, big impact.',
         estimated_cost_usd: 0,
         duration_minutes: 90,
       },
       {
         title: 'Dutch-oven cooking night',
-        kind: 'activity',
+        category: 'skill',
         description: 'Each team gets a dutch oven and a recipe. Cook dinner together outdoors and enjoy the results.',
         estimated_cost_usd: 25,
         duration_minutes: 120,
       },
       {
         title: 'Temple grounds walk and reflection',
-        kind: 'outing',
+        category: 'spiritual',
         description: 'Drive to the nearest temple, walk the grounds, and share a brief devotional at the end.',
         estimated_cost_usd: 5,
         duration_minutes: 90,
       },
       {
         title: 'Board-game night',
-        kind: 'weekly',
+        category: 'social',
         description: 'Stations of group-friendly games — Codenames, Telestrations, Werewolf. Snacks included.',
         estimated_cost_usd: 15,
         duration_minutes: 75,
@@ -205,6 +205,16 @@ describe('runActivitySuggester', () => {
         : JSON.stringify(userMessage?.content)
 
     expect(content).not.toContain('Zygmuntowicz')
+  })
+
+  it('system content contains "spiritual" (new taxonomy is in the prompt)', async () => {
+    mockedWithUsage.mockResolvedValueOnce(fakeUsageResult(makeValidToolInput()))
+
+    await runActivitySuggester(makeInput())
+
+    const callArg = mockedWithUsage.mock.calls[0]![0]
+    const systemContent = JSON.stringify(callArg.system)
+    expect(systemContent).toContain('spiritual')
   })
 
   it('when recent_activities is empty, user message contains at least one title from activity_ideas.json', async () => {

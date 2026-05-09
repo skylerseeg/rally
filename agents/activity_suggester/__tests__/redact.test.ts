@@ -43,7 +43,7 @@ describe('redactForSuggester', () => {
   it('member_summaries contain first_name only — no last_name, no birthdate string', () => {
     const result = redactForSuggester(makeInput())
     expect(result.audience.member_summaries).toHaveLength(1)
-    const summary = result.audience.member_summaries[0]
+    const summary = result.audience.member_summaries[0]!
 
     // first_name present
     expect(summary.first_name).toBe('James')
@@ -60,7 +60,7 @@ describe('redactForSuggester', () => {
       notes: { general: 'call 801-555-1234 for pickup arrangements' },
     })
     const result = redactForSuggester(makeInput({ members: [memberWithPhone] }))
-    const summary = result.audience.member_summaries[0]
+    const summary = result.audience.member_summaries[0]!
     expect(summary.notes_excerpt).not.toContain('801-555-1234')
     expect(summary.notes_excerpt).toContain('[phone]')
   })
@@ -86,14 +86,14 @@ describe('redactForSuggester', () => {
       recent_activities: [
         {
           title: 'Basketball Night',
-          kind: 'physical',
+          category: 'physical',
           starts_at: fourteenDaysAgo,
           attendance_summary: null,
         },
       ],
     })
     const result = redactForSuggester(input)
-    expect(result.recent_activities[0].weeks_ago).toBe(2)
+    expect(result.recent_activities[0]!.weeks_ago).toBe(2)
   })
 
   it('attendance_rate: {present:8, absent:2, excused:1} → ~0.727', () => {
@@ -101,14 +101,14 @@ describe('redactForSuggester', () => {
       recent_activities: [
         {
           title: 'Service Night',
-          kind: 'service',
+          category: 'service',
           starts_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
           attendance_summary: { present: 8, absent: 2, excused: 1 },
         },
       ],
     })
     const result = redactForSuggester(input)
-    const rate = result.recent_activities[0].attendance_rate
+    const rate = result.recent_activities[0]!.attendance_rate
     expect(rate).not.toBeNull()
     expect(rate!).toBeCloseTo(8 / 11, 5)
   })
@@ -118,13 +118,13 @@ describe('redactForSuggester', () => {
       recent_activities: [
         {
           title: 'Game Night',
-          kind: 'social',
+          category: 'social',
           starts_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
           attendance_summary: null,
         },
       ],
     })
     const result = redactForSuggester(input)
-    expect(result.recent_activities[0].attendance_rate).toBeNull()
+    expect(result.recent_activities[0]!.attendance_rate).toBeNull()
   })
 })
