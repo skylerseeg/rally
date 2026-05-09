@@ -140,3 +140,26 @@ export async function runActivitySuggester(input: Input): Promise<Output> {
 ## Testing
 
 Each agent ships at least one test under `__tests__/` that loads a recorded Anthropic response fixture and asserts the parsed output. CI runs with `ANTHROPIC_API_KEY` unset; tests must not hit the live API.
+
+---
+
+# Agents
+
+Each agent lives in `agents/<name>/` with this shape:
+
+- `index.ts` — single entrypoint `run<PascalCase>(input)`. Imports `withUsage` from `@/lib/anthropic`. Never imports `@anthropic-ai/sdk` directly.
+- `prompt.ts` — exports `buildSystem()` (static portion has `cache_control: 'ephemeral'`) and `buildUserMessage(ctx, ...)`.
+- `schema.ts` — Zod schemas for output validation, plus the Anthropic tool definition (`input_schema`).
+- `redact.ts` — domain-specific redaction. Composes `lib/redact.ts` primitives. Returns a typed redacted context that is the ONLY thing passed to `prompt.ts`.
+- `__tests__/` — at minimum: redaction, schema, integration (mocked).
+
+## Conventions
+
+- Force structured output via `tool_choice: { type: 'tool', name: '...' }`. Never rely on free-form text parsing.
+- `withUsage` provides usage logging; pass `caller.unitId` faithfully.
+- System prompts have a static portion that is cached; dynamic context goes in the user message.
+- Redaction is a hard wall: raw member data is forbidden in prompts. `lib/redact.ts` includes a runtime guard that throws if first name + birthdate appear in the same record.
+
+## Current agents
+
+- **activity_suggester** — suggests 3–7 activities for a unit given recent history and constraints. Tier: `default`.
