@@ -164,3 +164,16 @@ Resolved scope decisions for v1. Update this list when a decision changes; do no
   `withUsage` now logs every Anthropic call unconditionally. Application-level
   callers must still pass a real unit_id when one exists; null is reserved
   for genuinely unscoped operations.
+- **LDS Tools / Member Tools API (2026-05-08):** Not integrating. The Church
+  publishes no public API for ward directory or member data; any community
+  library against `churchofjesuschrist.org` endpoints is reverse-engineered
+  scraping. Rejected for four reasons: (1) ToS posture — using internal
+  endpoints from a multi-leader app is outside acceptable use; (2) auth model
+  would require leaders to share Church account credentials, which Rally
+  cannot responsibly secure; (3) it inverts the trust boundary documented
+  above — member PII would arrive via a third-party library before the
+  redactor sees it; (4) reverse-engineered endpoints break unpredictably.
+  Path forward: keep manual entry as the primary intake, add CSV import as a
+  later prompt (a leader exports the official directory CSV from Member Tools
+  and uploads), watch for an official credentialed API. Revisit only when one
+  ships.
