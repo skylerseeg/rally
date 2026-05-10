@@ -26,6 +26,7 @@ export type ActivityFormInitial = {
   ends_at: string | null;
   location: string | null;
   category: ActivityCategory;
+  source_suggestion_id?: string | null;
 };
 
 type Props = {
@@ -73,6 +74,13 @@ export function ActivityForm({
       className="flex flex-col gap-6"
       noValidate
     >
+      {initial?.source_suggestion_id ? (
+        <input
+          type="hidden"
+          name="source_suggestion_id"
+          value={initial.source_suggestion_id}
+        />
+      ) : null}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2 flex flex-col gap-1">
           <Label htmlFor="title">Title *</Label>

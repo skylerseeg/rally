@@ -25,6 +25,14 @@ function parseFormData(fd: FormData): Record<string, unknown> {
   };
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function readSourceSuggestionId(fd: FormData): string | null {
+  const raw = String(fd.get("source_suggestion_id") ?? "").trim();
+  return UUID_RE.test(raw) ? raw : null;
+}
+
 async function ensureWriteAccess(): Promise<
   { unitId: string; userId: string } | { error: string }
 > {
@@ -53,6 +61,7 @@ export async function createActivity(formData: FormData): Promise<ActionResult> 
   }
 
   const supabase = await createClient();
+  const sourceSuggestionId = readSourceSuggestionId(formData);
   const { data, error } = await supabase
     .from("activities")
     .insert({
@@ -70,6 +79,8 @@ export async function createActivity(formData: FormData): Promise<ActionResult> 
       location: parsed.data.location || null,
       category: parsed.data.category,
       planned_by: access.userId,
+      source_suggestion_id: sourceSuggestionId,
+      ai_suggested: sourceSuggestionId !== null,
     })
     .select("id")
     .single();
