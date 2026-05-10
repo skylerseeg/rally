@@ -4,6 +4,7 @@
 // default is the current week.
 
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -97,9 +98,17 @@ export default async function ActivitiesPage({ searchParams }: Props) {
             Plan, record attendance, and see what's coming up.
           </p>
         </div>
-        <Link href="/activities/new">
-          <Button>New activity</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/activities/suggest">
+            <Button variant="secondary">
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              Suggest with AI
+            </Button>
+          </Link>
+          <Link href="/activities/new">
+            <Button>New activity</Button>
+          </Link>
+        </div>
       </header>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
