@@ -214,8 +214,12 @@ describe("withUsage — skipUsageLogging", () => {
   });
 });
 
-describe("withUsage — non-fatal logging failure", () => {
+describe("withUsage — non-fatal logging failure (production)", () => {
   it("returns the agent result even if usage_events insert errors", async () => {
+    // The swallow-in-prod contract only applies when NODE_ENV is
+    // 'production' — outside prod we rethrow so dev/test/CI catch the
+    // failure. See Decisions Log entry 2026-05-10.
+    vi.stubEnv("NODE_ENV", "production");
     messagesCreateMock.mockResolvedValueOnce(fakeMessage());
     insertMock.mockResolvedValueOnce({
       error: { message: "DB blew up" },
@@ -223,6 +227,8 @@ describe("withUsage — non-fatal logging failure", () => {
 
     const result = await withUsage<{ foo: string }>(makeInput());
     expect(result.toolInput).toEqual({ foo: "bar" });
+
+    vi.unstubAllEnvs();
   });
 });
 

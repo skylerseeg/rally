@@ -160,7 +160,69 @@ async function writeUsageEvent(args: {
     // redaction_summary omitted; DB default '{}'.
   });
   if (error) {
-    throw new Error(`usage_events insert failed: ${error.message}`);
+    // Preserve PostgrestError context (code, details) on the thrown
+    // Error so the outer .catch can surface it through the structured
+    // log and the dead-letter payload.
+    const wrapped: Error & { code?: string; details?: string } = new Error(
+      `usage_events insert failed: ${error.message}`,
+    );
+    if (error.code) wrapped.code = error.code;
+    if (error.details) wrapped.details = error.details;
+    throw wrapped;
+  }
+}
+
+/**
+ * Best-effort dead-letter write. Called only in production when the
+ * primary usage_events insert fails. Never throws to the caller — if
+ * the dead-letter insert itself fails, we log and move on. The dead-
+ * letter table has no RLS policies; only the service role can write.
+ */
+async function writeDeadLetter(args: {
+  agentName: string;
+  model: string;
+  unitId: string | null;
+  userId: string;
+  payload: Record<string, unknown>;
+  originalError: unknown;
+}): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    const err = args.originalError as {
+      message?: string;
+      code?: string;
+      details?: string;
+    } | null;
+    const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- reason: usage_events_failed lands in supabase/types.ts after migration 0004 runs in CI
+      .from("usage_events_failed" as any)
+      .insert({
+        agent_name: args.agentName,
+        model: args.model,
+        unit_id: args.unitId,
+        user_id_raw: args.userId,
+        payload: args.payload,
+        error_message:
+          err?.message ??
+          (args.originalError instanceof Error
+            ? args.originalError.message
+            : String(args.originalError)),
+        error_code: err?.code ?? null,
+        error_details: err?.details ?? null,
+      });
+    if (error) {
+      log.error({
+        event: "dead_letter_insert_failed",
+        agent: args.agentName,
+        err: error.message,
+      });
+    }
+  } catch (err) {
+    log.error({
+      event: "dead_letter_threw",
+      agent: args.agentName,
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -218,11 +280,49 @@ export async function withUsage<T = unknown>(
       latencyMs,
       errorCode,
     }).catch((err) => {
-      // Logging must NEVER break the agent call. Log and swallow.
+      // Telemetry failures must surface. Structured-log everywhere;
+      // rethrow in non-prod so dev/test/CI fail loudly; in prod, write
+      // to the usage_events_failed dead-letter so we have a queryable
+      // signal. The user-facing agent call still completes.
+      const e = err as {
+        message?: string;
+        name?: string;
+        code?: string;
+        details?: string;
+      };
       log.error({
         event: "write_usage_event_failed",
         agent: input.agentName,
-        err: err instanceof Error ? err.message : String(err),
+        model,
+        err_message: e?.message ?? String(err),
+        err_name: e?.name ?? null,
+        supabase_code: e?.code ?? null,
+        supabase_details: e?.details ?? null,
+      });
+
+      if (process.env.NODE_ENV !== "production") {
+        throw err;
+      }
+
+      // Production: dead-letter so we have a queryable signal.
+      void writeDeadLetter({
+        agentName: input.agentName,
+        model,
+        unitId: input.context.unitId,
+        userId: input.context.userId,
+        payload: {
+          agent_name: input.agentName,
+          model,
+          unit_id: input.context.unitId,
+          input_tokens: usage.inputTokens,
+          output_tokens: usage.outputTokens,
+          cache_creation_tokens: usage.cacheCreationTokens,
+          cache_read_tokens: usage.cacheReadTokens,
+          latency_ms: latencyMs,
+          request_hash: requestHash,
+          error_code: errorCode,
+        },
+        originalError: err,
       });
     });
   }
