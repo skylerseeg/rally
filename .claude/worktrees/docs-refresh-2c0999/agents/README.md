@@ -7,159 +7,89 @@ Every Claude-backed feature in Rally lives here. One directory per agent. The co
 ```
 agents/
 └── <agent_name>/
-    ├── agent.ts          entrypoint: run<PascalCaseName>(input)
-    ├── prompt.ts         SYSTEM_PROMPT + buildMessages(input)
-    ├── schema.ts         Zod InputSchema, OutputSchema, types
-    ├── tools.ts          Anthropic tool definitions
-    ├── index.ts          re-exports
-    └── __tests__/        fixture-based tests
+    ├── index.ts          entrypoint: run<PascalCaseName>(input)
+    ├── prompt.ts         buildSystem() + buildUserMessage(ctx, ...)
+    ├── schema.ts         Zod schemas + the Anthropic tool definition (input_schema)
+    ├── redact.ts         domain-specific redaction; composes lib/redact.ts primitives
+    └── __tests__/        at minimum: redaction, schema, integration (Anthropic SDK mocked)
 ```
+
+There is **no** `agent.ts` and no `tools.ts` — those are folded into `index.ts` and `schema.ts` respectively.
 
 ## Required exports
 
 `agents/<name>/index.ts` must export:
 
-- `run<PascalCaseName>(input: Input): Promise<Output>` — the single entrypoint.
-- `InputSchema`, `OutputSchema` — Zod schemas.
-- `Input`, `Output` — inferred types.
+- `run<PascalCaseName>(input: RunAgentInput): Promise<RunAgentResult>` — the single entrypoint. Takes `{ context, caller, ... }` and returns `{ output, usage }`.
+- Input/result TypeScript types.
 
-Nothing else. No "helpers" leaking out of the directory; if multiple agents need the same helper, it lives in `lib/`.
+Zod schemas (`*OutputSchema`, etc.) live in `schema.ts`. Callers import them from `@/agents/<name>/schema` directly if they need to validate the model output. Helpers that span multiple agents go in `lib/`, not here.
+
+## Redaction (hard wall)
+
+Raw `members` rows are forbidden in prompts. Each agent has its own `redact.ts` that composes the primitives in `lib/redact.ts`:
+
+- `redactMember(member, opts?)` / `redactMembers(...)` — first-name-only, age in years, opaque per-request id tokens, optional notes (scrubbed of phone/email/url/zip/address-shaped substrings).
+- `scrubNotes(text)` — call this directly when you forward leader-written notes.
+- `createTokenMapper(seed, salt?)` — token ↔ real id mapping for round-tripping suggestions back to members.
+- `_assertNoNameAndDob(record)` — runtime guard that throws if a record carries both a name field and a date-shaped value. Belt-and-suspenders against accidentally re-introducing DOB.
+
+The redacted context type is the **only** thing passed to `prompt.ts`.
 
 ## Model selection
 
-- Default: `claude-sonnet-4-5`.
-- Cheap classification / redaction QA / summarisation: `claude-haiku-4-5`.
-- Deep-reasoning opt-in (lesson_planner deep mode): `claude-opus-4-5`, gated by a feature flag.
+Pull from `lib/anthropic/models.ts` via tiers — don't hardcode dated snapshots in the agent.
 
-Don't hardcode dated snapshots in the agent. Pull from `lib/anthropic/models.ts`.
+- `default` → `claude-sonnet-4-5` (most agents).
+- `cheap` → `claude-haiku-4-5` (classification, redaction QA, summarisation).
+- `deep` → `claude-opus-4-5` (lesson_planner deep-reasoning path, behind a feature flag).
 
 ## Prompt caching
 
-The system prompt is the cached portion. Pass it as a content block on the `system` field with `cache_control`:
-
-```ts
-system: [
-  { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-],
-```
-
-Keep `SYSTEM_PROMPT` stable across calls. Per-call context (the redacted member roster, recent activities, lesson reference) goes in the user message — that part is not cached.
+`buildSystem()` returns a content-block array with `cache_control: { type: "ephemeral" }` so Anthropic caches the static portion across calls. Keep the system prompt stable per agent version; per-call context (redacted roster, recent activities, lesson refs) lives in the user message and is not cached.
 
 ## Structured output via forced tool use
 
-Define one tool whose `input_schema` matches `OutputSchema`. Force it:
+Define one tool in `schema.ts` whose `input_schema` mirrors your Zod output schema. Force it via `tool_choice: { type: "tool", name: "<tool_name>" }`. Don't ask Claude to "return JSON" in prose — that's drift-prone.
 
-```ts
-tool_choice: { type: "tool", name: "emit_<agent_name>_result" },
-```
-
-Then validate:
-
-```ts
-const toolUse = response.content.find((b) => b.type === "tool_use");
-if (!toolUse) throw new AgentRefusalError(...);
-return OutputSchema.parse(toolUse.input);
-```
+After the call, validate the tool input against the Zod schema. If `tool_use` is missing or the parse fails, throw — translation to typed errors (`AgentRefusalError`, `AgentSchemaError`, `AgentRateLimitError` from `lib/errors.ts`) is the action-layer's job today; the agent itself just signals failure clearly.
 
 ## Usage logging (required)
 
-Every call goes through `withUsage()`:
+Every call goes through `withUsage` from `@/lib/anthropic`:
 
 ```ts
-return withUsage(
-  { agent: "activity_suggester", unitId, userId, model },
-  async () => {
-    const redacted = redact(input);                    // throws on un-redactable input
-    const response = await anthropic.messages.create({ ... });
-    const toolUse = response.content.find((b) => b.type === "tool_use");
-    if (!toolUse) throw new AgentRefusalError("no tool_use");
-    return { result: OutputSchema.parse(toolUse.input), usage: response.usage };
-  },
-);
+const result = await withUsage<unknown>({
+  agentName: "<agent_name>",
+  tier: "default",
+  system: buildSystem(),
+  messages: [buildUserMessage(redacted, ...)],
+  tools: [theTool as unknown as Anthropic.Messages.Tool],
+  toolChoice: { type: "tool", name: "<tool_name>" },
+  maxTokens: 2048,
+  temperature: 0.8,
+  context: { userId: caller.userId, unitId: caller.unitId },
+});
 ```
 
-`withUsage` writes a `usage_events` row with hashed user id (SHA-256 of `userId || unitId || dayBucket || RALLY_USAGE_HASH_SALT`), unit id, agent name, model, token counts (input, output, cache read, cache creation), latency, and a redaction summary. It logs whether the call succeeded or failed.
+`withUsage` writes a `usage_events` row with the SHA-256 of `user_id || unit_id || day_bucket || RALLY_USAGE_HASH_SALT` (per-day-bucketed; never the raw user id), unit id, agent name, model, token counts, latency, request hash, and `error_code`. `unit_id` may be `null` for system-level calls (batch jobs, smoke tests, ops).
 
-## Minimal example
+The `usage_events` insert path is exempt from the "service-role only in `workers/` and `app/api/admin/`" rule; see the Decisions Log in `docs/ARCHITECTURE.md`.
 
-```ts
-// agents/activity_suggester/agent.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { withUsage } from "@/lib/anthropic/withUsage";
-import { redact } from "@/lib/redact";
-import { MODELS } from "@/lib/anthropic/models";
-import { AgentRefusalError } from "@/lib/errors";
-import { InputSchema, OutputSchema, type Input, type Output } from "./schema";
-import { SYSTEM_PROMPT, buildMessages } from "./prompt";
-import { activityTool } from "./tools";
+## Reference implementation
 
-const client = new Anthropic();
+`agents/activity_suggester/` is the canonical example — read it after this README. It:
 
-export async function runActivitySuggester(input: Input): Promise<Output> {
-  const parsed = InputSchema.parse(input);
-
-  return withUsage(
-    {
-      agent: "activity_suggester",
-      unitId: parsed.unitId,
-      userId: parsed.userId,
-      model: MODELS.sonnet,
-    },
-    async () => {
-      const redacted = redact(parsed);
-
-      const response = await client.messages.create({
-        model: MODELS.sonnet,
-        max_tokens: 1024,
-        system: [
-          {
-            type: "text",
-            text: SYSTEM_PROMPT,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        tools: [activityTool],
-        tool_choice: { type: "tool", name: "emit_activity_suggestions" },
-        messages: buildMessages(redacted),
-      });
-
-      const toolUse = response.content.find((b) => b.type === "tool_use");
-      if (!toolUse || toolUse.type !== "tool_use") {
-        throw new AgentRefusalError("activity_suggester returned no tool_use");
-      }
-
-      return {
-        result: OutputSchema.parse(toolUse.input),
-        usage: response.usage,
-      };
-    },
-  );
-}
-```
-
-## Testing
-
-Each agent ships at least one test under `__tests__/` that loads a recorded Anthropic response fixture and asserts the parsed output. CI runs with `ANTHROPIC_API_KEY` unset; tests must not hit the live API.
-
----
-
-# Agents
-
-Each agent lives in `agents/<name>/` with this shape:
-
-- `index.ts` — single entrypoint `run<PascalCase>(input)`. Imports `withUsage` from `@/lib/anthropic`. Never imports `@anthropic-ai/sdk` directly.
-- `prompt.ts` — exports `buildSystem()` (static portion has `cache_control: 'ephemeral'`) and `buildUserMessage(ctx, ...)`.
-- `schema.ts` — Zod schemas for output validation, plus the Anthropic tool definition (`input_schema`).
-- `redact.ts` — domain-specific redaction. Composes `lib/redact.ts` primitives. Returns a typed redacted context that is the ONLY thing passed to `prompt.ts`.
-- `__tests__/` — at minimum: redaction, schema, integration (mocked).
-
-## Conventions
-
-- Force structured output via `tool_choice: { type: 'tool', name: '...' }`. Never rely on free-form text parsing.
-- `withUsage` provides usage logging; pass `caller.unitId` faithfully.
-- System prompts have a static portion that is cached; dynamic context goes in the user message.
-- Redaction is a hard wall: raw member data is forbidden in prompts. `lib/redact.ts` includes a runtime guard that throws if first name + birthdate appear in the same record.
+- Builds a `SuggesterContextInput` from raw unit data, runs it through `redact.ts` before anything reaches `prompt.ts`.
+- Forces the `suggest_activities` tool, parses the input with `suggesterOutputSchema`, throws on schema failure or missing tool use.
+- Returns `{ output, usage }` so callers can both consume the parsed result and report on telemetry.
 
 ## Current agents
 
-- **activity_suggester** — suggests 3–7 activities for a unit given recent history and constraints. Tier: `default`.
+- **activity_suggester** — suggests 3–7 activities for a unit given recent history, member roster, and constraints. Tier: `default`. UI surface: `/activities/suggest`.
+
+Planned (not yet implemented): `lesson_planner` (Come, Follow Me alignment + deep-reasoning opt-in).
+
+## Testing
+
+Each agent ships at least one test under `__tests__/` that mocks `@/lib/anthropic` (`withUsage`) and asserts the parsed output, redaction behavior, and the prompt envelope (e.g. "raw last names never appear in the user message"). CI runs with `ANTHROPIC_API_KEY` unset; tests must not hit the live API.
