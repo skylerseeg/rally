@@ -7,12 +7,18 @@ export default function SuggestActivityPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
+      <div className="flex items-center justify-between">
         <Link
           href="/activities"
           className="text-sm font-medium text-slate-600 hover:text-slate-900"
         >
           &larr; Back to activities
+        </Link>
+        <Link
+          href="/activities/suggest/history"
+          className="text-sm font-medium text-slate-600 hover:text-slate-900"
+        >
+          View history &rarr;
         </Link>
       </div>
       <div className="flex flex-col gap-1">
