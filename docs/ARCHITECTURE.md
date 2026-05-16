@@ -177,3 +177,25 @@ Resolved scope decisions for v1. Update this list when a decision changes; do no
   later prompt (a leader exports the official directory CSV from Member Tools
   and uploads), watch for an official credentialed API. Revisit only when one
   ships.
+- **Telemetry failures must surface (2026-05-10):** `lib/anthropic/withUsage.ts`
+  previously swallowed `usage_events` insert failures with a log-only `.catch`.
+  On Vercel serverless, log-only failure modes are invisible. P12 prod
+  verification surfaced this — agent calls succeeded, telemetry silently
+  dropped, no symptom for ~2 days. Going forward, any state-changing
+  operation that swallows errors in production must (a) rethrow in non-prod
+  so dev/CI catch the failure, and (b) write to a queryable dead-letter
+  table in prod. Pure log-and-forget is banned for state-changing ops.
+  Implementation: `withUsage` now structured-logs (`event:
+  write_usage_event_failed`) with full Supabase error context (code,
+  details), rethrows when `NODE_ENV !== 'production'`, and writes to
+  `usage_events_failed` (migration 0004) in production. The dead-letter
+  insert itself is best-effort — failures there log and move on, so a
+  telemetry hiccup never breaks the user-facing call.
+- **Pre-merge env verification (2026-05-10):** Three prod silent failures
+  in Rally traced to env config (swapped service-role/anon keys; localhost
+  Site URL; empty-string Vercel env values from P12). Added
+  `scripts/verify-prod-env.sh` to confirm every required key is present,
+  non-empty, correctly shaped, and (for JWTs) holds the right role claim.
+  Run before any PR touching `lib/anthropic/`, auth, or env-reading code.
+  Not in CI yet — requires Vercel auth; documented as a manual pre-merge
+  step.

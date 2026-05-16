@@ -86,3 +86,6 @@ Thumbs.db
 # Local scratch files for ad-hoc smoke tests and one-off scripts.
 # Anything here is ephemeral and should never be committed.
 /scratch/
+
+# Temporary dumps from scripts/verify-prod-env.sh
+.env.*.verify.tmp
