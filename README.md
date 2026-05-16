@@ -104,7 +104,7 @@ pnpm dev          # start Next.js dev server (Turbopack)
 pnpm typecheck    # tsc --noEmit
 pnpm test         # vitest run
 pnpm test:watch   # vitest watch mode
-pnpm lint         # next lint
+pnpm lint         # ⚠ broken on Next 16 — `next lint` was removed; rely on typecheck + tests until a flat-config eslint script replaces it
 pnpm format       # prettier --write
 pnpm build        # production build
 ```
@@ -144,17 +144,33 @@ Every domain table needs `unit_id`, RLS enabled, and policies using `app.accessi
 # /new-agent <agent_name> "<one-line purpose>"
 ```
 
-The slash command scaffolds `agents/<name>/{agent,prompt,schema,tools,index}.ts` with redaction + `withUsage()` wired in. Read [`agents/README.md`](./agents/README.md) for the contract.
+The slash command scaffolds `agents/<name>/{index,prompt,schema,redact}.ts` plus a `__tests__/` directory with redaction + `withUsage()` wired in. Read [`agents/README.md`](./agents/README.md) for the contract.
+
+### Generate activity suggestions in the UI
+
+Once you're signed in with a `unit_memberships` row:
+
+1. Visit `/activities` and click **Suggest with AI** (top-right).
+2. Pick a target date (defaults to next Wednesday), optional category, and any free-text constraints.
+3. Claude returns 3–7 suggestions in 6–12 seconds. The full batch persists to `agent_suggestions` (RLS-gated by unit).
+4. Click **Use this** on a card — you land on `/activities/new` pre-filled (title, description, category, starts_at @ 7pm). The click also writes an `audit_events` row with `action = 'activity_suggestion_used'`.
+5. Save the activity. `activities.source_suggestion_id` links back to the row and `ai_suggested` flips to `true` — that's how we'll measure agent usefulness over time.
+
+Telemetry: every Anthropic call writes to `usage_events` via `lib/anthropic/withUsage` regardless of the user's session. The hashed user id is `sha256(user_id || unit_id || day_bucket || RALLY_USAGE_HASH_SALT)` — never the raw uuid.
 
 ### Apply changes to the hosted project
 
-The harness blocks anything that targets the linked Supabase project from this machine. To apply a migration in production:
+A migration on disk does **not** mean a migration on hosted. After a migration PR merges, the maintainer pushes it to the linked hosted Supabase project from a trusted machine:
 
-1. Open the hosted project's **SQL Editor**.
-2. Paste the migration SQL (`supabase/migrations/<timestamped>.sql`).
-3. Run it.
+```bash
+supabase db push
+```
 
-Seed updates: paste `supabase/seeds/<file>.sql` the same way.
+Confirm the change landed by checking the column / table in **Studio → SQL Editor** or running a quick query against the hosted project. The Anthropic dead-letter table (`usage_events_failed`) is a good recent example of why this verification step matters — a migration that exists in `supabase/migrations/` but hasn't been pushed will look fine in dev and silently break in prod.
+
+Claude Code sessions don't run `supabase db push` themselves; see CLAUDE.md "Git Workflow".
+
+Seed updates land the same way (`supabase db push` re-applies migrations only — to update seed data on hosted, paste `supabase/seeds/<file>.sql` into the hosted project's SQL Editor).
 
 ### Open a PR
 
