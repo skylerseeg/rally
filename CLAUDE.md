@@ -141,6 +141,6 @@ These are non-negotiable. A PR that violates one gets reverted.
 - Feature branches: `claude/<short-task-slug>-<random>` for Claude-driven work, `<initials>/<slug>` for human work.
 - One logical change per PR. Migrations get their own PR when feasible.
 - Local checks before opening a PR: `pnpm typecheck` and `pnpm test`. (`pnpm lint` is currently broken on Next 16 — `next lint` was removed; skip it until a flat-config eslint replacement lands.)
-- A GitHub Actions workflow that runs these on every PR + dry-runs the migration is on the roadmap; not in place yet.
+- CI: `.github/workflows/ci.yml` runs `pnpm typecheck` + `pnpm test` on every pull request and on push to `main`. Make it a required status check in branch protection so failing CI blocks merges. (Migration dry-run + `pnpm lint` are still on the roadmap — out of scope until the lint script is unbroken and the migration count justifies a throwaway DB in CI.)
 - Don't push to `main` directly. Don't force-push shared branches.
 - Migration deployment to hosted is a maintainer step: after the PR merges, the maintainer runs `supabase db push` from a trusted machine. Claude sessions must not run that command.
