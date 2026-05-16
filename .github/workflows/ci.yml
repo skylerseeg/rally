@@ -1,0 +1,74 @@
+# .github/workflows/ci.yml
+#
+# Runs `pnpm typecheck` + `pnpm test` on every pull request and on push
+# to main. This is the structural fix for the failure mode that bit P12:
+# bugs landing on main with no automated gate.
+#
+# Intentionally NOT included yet:
+#   - `pnpm lint`  — `next lint` was removed in Next 16 and our `lint`
+#                    script errors out. Restore (or replace with a flat-
+#                    config eslint script) in a follow-up.
+#   - `pnpm build` — needs real-shaped env vars; current pipeline runs on
+#                    placeholder values which would either fail (if a
+#                    code path validates at build time) or pass-falsely
+#                    (if it doesn't). Add separately if/when we want to
+#                    catch SSR/import-time breakage in CI.
+#   - Supabase migration dry-run — needs `supabase` CLI + a throwaway DB
+#                                   in the job. Worth adding when the
+#                                   migration count grows; for v1 the
+#                                   manual `supabase db push` step is
+#                                   the only gate.
+#
+# After this lands, mark `typecheck + test` as a required status check on
+# the `main` branch in GitHub Settings → Branches → Branch protection.
+# Without that, the workflow runs but doesn't block merges on failure.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel an in-progress run when a PR is updated; let push-to-main runs
+  # finish (they don't pile up the same way).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: typecheck + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Tests
+        # withUsage and the agent tests set RALLY_USAGE_HASH_SALT /
+        # ANTHROPIC_API_KEY per-test, so we don't need real values here.
+        # If a future test needs them at the suite level, set them under
+        # `env:` rather than reaching for repository secrets — CI must
+        # never carry production keys.
+        run: pnpm test

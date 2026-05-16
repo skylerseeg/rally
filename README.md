@@ -174,7 +174,7 @@ Seed updates land the same way (`supabase db push` re-applies migrations only â€
 
 ### Open a PR
 
-Branches: `claude/<slug>-<random>` for AI-driven work, `<initials>/<slug>` for human work. PRs target `main` and run `pnpm lint`, `pnpm typecheck`, `pnpm test`, plus a Supabase migration dry-run when CI lands.
+Branches: `claude/<slug>-<random>` for AI-driven work, `<initials>/<slug>` for human work. PRs target `main`. GitHub Actions (`.github/workflows/ci.yml`) runs `pnpm typecheck` and `pnpm test` on every PR; mark these as a required status check in branch protection. `pnpm lint` is currently broken on Next 16 and is intentionally not in CI; Supabase migration dry-run is still on the roadmap.
 
 ---
 
