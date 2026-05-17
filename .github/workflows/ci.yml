@@ -13,13 +13,16 @@
 #                    code path validates at build time) or pass-falsely
 #                    (if it doesn't). Add separately if/when we want to
 #                    catch SSR/import-time breakage in CI.
-#   - Supabase migration dry-run — needs `supabase` CLI + a throwaway DB
-#                                   in the job. Worth adding when the
-#                                   migration count grows; for v1 the
-#                                   manual `supabase db push` step is
-#                                   the only gate.
+#   - Supabase migration dry-run — partially closed by the `db-tests` job
+#                                   below, which boots a local Postgres and
+#                                   runs `supabase db start` (applies every
+#                                   migration) before executing pgTAP. A
+#                                   migration that fails to apply will turn
+#                                   the job red. Production `supabase db
+#                                   push` is still the manual gate for
+#                                   pushing to hosted.
 #
-# After this lands, mark `typecheck + test` as a required status check on
+# Mark both `typecheck + test` and `db-tests` as required status checks on
 # the `main` branch in GitHub Settings → Branches → Branch protection.
 # Without that, the workflow runs but doesn't block merges on failure.
 
@@ -73,3 +76,28 @@ jobs:
         # `env:` rather than reaching for repository secrets — CI must
         # never carry production keys.
         run: pnpm test
+
+  db-tests:
+    name: db-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Postgres
+        # `supabase db start` boots only the database container (no Auth,
+        # Storage, Studio). All migrations under supabase/migrations are
+        # applied here; a broken migration fails the job at this step.
+        run: supabase db start
+
+      - name: Run pgTAP tests
+        # Discovers .sql files under supabase/tests/ recursively. Add new
+        # policy or schema tests there to extend this gate.
+        run: supabase test db
