@@ -1,0 +1,254 @@
+{
+  "$schema_note": "Static reference data: starter activity ideas for LDS youth quorum/class planning. Read by the activity_suggester agent and can be surfaced as inspiration in the planning UI. Categories follow the user-facing taxonomy (spiritual, physical, social, intellectual, service). Note: the database `activity_category` enum currently uses `skill` instead of `intellectual` — when the agent maps these into draft activity rows, treat `intellectual` ↔ `skill`, or align the enum in a future migration.",
+  "version": 1,
+  "categories": ["spiritual", "physical", "social", "intellectual", "service"],
+  "ideas": [
+    {
+      "id": "spiritual-testimony-night",
+      "title": "Testimony night",
+      "category": "spiritual",
+      "description": "Quiet, low-pressure evening where each youth shares a brief testimony or a scripture that's meant something to them this month.",
+      "prep_effort": "low",
+      "duration_minutes": 60,
+      "materials": ["scriptures", "soft seating"]
+    },
+    {
+      "id": "spiritual-come-follow-me-deep-dive",
+      "title": "Come, Follow Me deep dive",
+      "category": "spiritual",
+      "description": "Pick the upcoming Sunday's CFM block and study it together — read, mark, discuss application questions in small groups.",
+      "prep_effort": "low",
+      "duration_minutes": 60,
+      "materials": ["scriptures", "Come Follow Me manuals", "pencils"]
+    },
+    {
+      "id": "spiritual-temple-prep-walk",
+      "title": "Temple grounds walk and discussion",
+      "category": "spiritual",
+      "description": "Drive to the nearest temple, walk the grounds, and discuss the temple's symbolism and personal preparation.",
+      "prep_effort": "medium",
+      "duration_minutes": 120,
+      "materials": ["transportation", "modest dress reminder"]
+    },
+    {
+      "id": "spiritual-talk-prep-practice",
+      "title": "Sacrament-meeting talk prep workshop",
+      "category": "spiritual",
+      "description": "Practice writing and delivering a 3-minute talk. Pair up, give feedback, rotate.",
+      "prep_effort": "low",
+      "duration_minutes": 75,
+      "materials": ["paper", "pens", "talk-outline handout"]
+    },
+    {
+      "id": "spiritual-hymn-meditation",
+      "title": "Hymn study night",
+      "category": "spiritual",
+      "description": "Pick three hymns; read the lyrics together, share what each verse teaches, sing them.",
+      "prep_effort": "low",
+      "duration_minutes": 45,
+      "materials": ["hymnals", "piano or recorded accompaniment"]
+    },
+
+    {
+      "id": "physical-basketball",
+      "title": "Basketball night",
+      "category": "physical",
+      "description": "Open-gym basketball, warm-up drills, then half-court teams.",
+      "prep_effort": "low",
+      "duration_minutes": 60,
+      "materials": ["basketballs", "pinnies"]
+    },
+    {
+      "id": "physical-ultimate-frisbee",
+      "title": "Ultimate frisbee",
+      "category": "physical",
+      "description": "Field game, two teams, simple rules. Great for mixed athleticism.",
+      "prep_effort": "low",
+      "duration_minutes": 60,
+      "materials": ["frisbees", "cones", "field"]
+    },
+    {
+      "id": "physical-capture-the-flag",
+      "title": "Capture the flag (after dark)",
+      "category": "physical",
+      "description": "Glow-stick capture the flag. High energy, low cost.",
+      "prep_effort": "medium",
+      "duration_minutes": 75,
+      "materials": ["glow sticks", "two flags", "field or park"]
+    },
+    {
+      "id": "physical-hike",
+      "title": "Evening hike",
+      "category": "physical",
+      "description": "Short local trail, devotional at the summit, snacks.",
+      "prep_effort": "medium",
+      "duration_minutes": 120,
+      "materials": ["water", "headlamps if dusk", "transportation"]
+    },
+    {
+      "id": "physical-ninja-warrior",
+      "title": "Backyard ninja-warrior course",
+      "category": "physical",
+      "description": "Build an obstacle course from cones, ladders, ropes; time everyone.",
+      "prep_effort": "high",
+      "duration_minutes": 75,
+      "materials": ["obstacles", "stopwatch", "cushioning"]
+    },
+    {
+      "id": "physical-bike-ride",
+      "title": "Group bike ride",
+      "category": "physical",
+      "description": "Plan a route, ride together, ice cream stop on the way back.",
+      "prep_effort": "medium",
+      "duration_minutes": 90,
+      "materials": ["bikes", "helmets", "snack stop"]
+    },
+
+    {
+      "id": "social-game-night",
+      "title": "Board-game night",
+      "category": "social",
+      "description": "Stations of group-friendly games (Codenames, Werewolf, Telestrations).",
+      "prep_effort": "low",
+      "duration_minutes": 75,
+      "materials": ["boxed games", "tables", "snacks"]
+    },
+    {
+      "id": "social-pizza-and-movie",
+      "title": "Pizza and a short film",
+      "category": "social",
+      "description": "Pizza followed by a short Church-produced film, then quick discussion.",
+      "prep_effort": "low",
+      "duration_minutes": 90,
+      "materials": ["pizza", "projector or TV", "video file"]
+    },
+    {
+      "id": "social-scavenger-hunt",
+      "title": "Neighborhood scavenger hunt",
+      "category": "social",
+      "description": "Photo scavenger hunt around the meetinghouse or local park.",
+      "prep_effort": "medium",
+      "duration_minutes": 75,
+      "materials": ["printed list", "phones", "small prizes"]
+    },
+    {
+      "id": "social-talent-night",
+      "title": "Talent night",
+      "category": "social",
+      "description": "Each youth shares a 3-minute talent — instrument, magic, juggling, art.",
+      "prep_effort": "low",
+      "duration_minutes": 60,
+      "materials": ["sound system", "stage area"]
+    },
+    {
+      "id": "social-progressive-dinner",
+      "title": "Progressive dinner",
+      "category": "social",
+      "description": "Three homes, three courses (appetizer, main, dessert).",
+      "prep_effort": "high",
+      "duration_minutes": 150,
+      "materials": ["host families", "transportation", "menu coordination"]
+    },
+
+    {
+      "id": "intellectual-financial-literacy",
+      "title": "Financial literacy 101",
+      "category": "intellectual",
+      "description": "Tithing, savings, simple budgeting, what compound interest does over 50 years.",
+      "prep_effort": "medium",
+      "duration_minutes": 60,
+      "materials": ["handouts", "calculator", "guest speaker (optional)"]
+    },
+    {
+      "id": "intellectual-public-speaking",
+      "title": "Public speaking practice",
+      "category": "intellectual",
+      "description": "Impromptu speech drill, then a short structured talk with feedback.",
+      "prep_effort": "low",
+      "duration_minutes": 60,
+      "materials": ["topic cards", "timer"]
+    },
+    {
+      "id": "intellectual-science-demos",
+      "title": "Backyard science demos",
+      "category": "intellectual",
+      "description": "Three or four hands-on demos (Mentos+Coke, elephant toothpaste, pendulum waves).",
+      "prep_effort": "high",
+      "duration_minutes": 75,
+      "materials": ["per-demo supplies", "safety glasses", "tarp"]
+    },
+    {
+      "id": "intellectual-chess-tournament",
+      "title": "Mini chess tournament",
+      "category": "intellectual",
+      "description": "Round-robin chess, quick games (10-minute clocks).",
+      "prep_effort": "low",
+      "duration_minutes": 90,
+      "materials": ["chess sets", "clocks", "bracket sheet"]
+    },
+    {
+      "id": "intellectual-debate-night",
+      "title": "Friendly debate night",
+      "category": "intellectual",
+      "description": "Light topics, two-vs-two debates with a moderator.",
+      "prep_effort": "low",
+      "duration_minutes": 60,
+      "materials": ["topic list", "timer"]
+    },
+
+    {
+      "id": "service-yard-cleanup",
+      "title": "Yard cleanup for widows in the ward",
+      "category": "service",
+      "description": "Coordinate with Relief Society, split into teams, mow/rake/weed.",
+      "prep_effort": "medium",
+      "duration_minutes": 90,
+      "materials": ["rakes", "trash bags", "gloves", "lawn equipment"]
+    },
+    {
+      "id": "service-food-bank-shift",
+      "title": "Food bank volunteer shift",
+      "category": "service",
+      "description": "Sign up for a sorting/packing shift at the local food bank.",
+      "prep_effort": "low",
+      "duration_minutes": 120,
+      "materials": ["closed-toe shoes", "transportation"]
+    },
+    {
+      "id": "service-missionary-letters",
+      "title": "Letters to ward missionaries",
+      "category": "service",
+      "description": "Write personal notes to each missionary serving from the ward.",
+      "prep_effort": "low",
+      "duration_minutes": 45,
+      "materials": ["stationery", "pens", "stamps", "addresses"]
+    },
+    {
+      "id": "service-hygiene-kits",
+      "title": "Hygiene-kit assembly",
+      "category": "service",
+      "description": "Assemble kits for a local shelter or refugee resettlement org.",
+      "prep_effort": "medium",
+      "duration_minutes": 60,
+      "materials": ["kit components", "bags", "drop-off location"]
+    },
+    {
+      "id": "service-elderly-notes",
+      "title": "Hand-written notes to elderly members",
+      "category": "service",
+      "description": "Each youth writes a short note to two homebound or elderly ward members.",
+      "prep_effort": "low",
+      "duration_minutes": 45,
+      "materials": ["stationery", "pens", "ward list (privacy: leader-curated)"]
+    },
+    {
+      "id": "service-meetinghouse-cleanup",
+      "title": "Meetinghouse grounds cleanup",
+      "category": "service",
+      "description": "Pick up litter, sweep walkways, clear weeds around the building.",
+      "prep_effort": "low",
+      "duration_minutes": 60,
+      "materials": ["trash bags", "brooms", "gloves"]
+    }
+  ]
+}
