@@ -1,0 +1,88 @@
+# ---------------------------------------------------------------------------
+# Rally — .gitignore
+# ---------------------------------------------------------------------------
+
+# --- Dependencies ----------------------------------------------------------
+node_modules/
+.pnp
+.pnp.*
+.yarn/install-state.gz
+
+# --- Next.js ---------------------------------------------------------------
+.next/
+out/
+build/
+dist/
+
+# --- Production ------------------------------------------------------------
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Environment files (NEVER commit secrets) ------------------------------
+.env
+.env.local
+.env*.local
+.env.development
+.env.production
+# .env.example is committed intentionally as a template
+
+# --- Vercel ----------------------------------------------------------------
+.vercel
+
+# --- Supabase --------------------------------------------------------------
+# Local Supabase stack data
+supabase/.branches
+supabase/.temp
+supabase/.env
+**/supabase/.env
+
+# --- Testing ---------------------------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+playwright-report/
+test-results/
+.playwright/
+
+# --- TypeScript ------------------------------------------------------------
+*.tsbuildinfo
+
+# --- Logs ------------------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Editor / OS -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Cursor ----------------------------------------------------------------
+# Keep .cursor/skills/ and rules committed; ignore local state only
+.cursor/cache/
+.cursor/local/
+
+# --- Claude Code -----------------------------------------------------------
+# Keep .claude/commands/, .claude/skills/, .claude/settings.json committed
+# Ignore local-only state
+.claude/local/
+.claude/cache/
+
+# --- Misc ------------------------------------------------------------------
+*.pem
+.turbo/
+.cache/
+.parcel-cache/
+
+# Local scratch files for ad-hoc smoke tests and one-off scripts.
+# Anything here is ephemeral and should never be committed.
+/scratch/
