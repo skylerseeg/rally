@@ -26,6 +26,14 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+vi.mock("next/navigation", () => ({
+  // useThisSuggestion ends with redirect(); throw a recognisable sentinel
+  // so the test can assert the action completed without bailing the suite.
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
+}));
+
 import { runActivitySuggester } from "@/agents/activity_suggester";
 import { requireLeader, requireUnitAccess } from "@/lib/auth/guards";
 import { getActiveUnit } from "@/lib/auth/units";
@@ -37,7 +45,7 @@ import {
 } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
 
-import { generateSuggestions } from "../actions";
+import { generateSuggestions, useThisSuggestion } from "../actions";
 
 const mockedRunAgent = vi.mocked(runActivitySuggester);
 const mockedRequireLeader = vi.mocked(requireLeader);
@@ -284,5 +292,58 @@ describe("generateSuggestions", () => {
       expect(result.kind).toBe("validation");
     }
     expect(mockedRunAgent).not.toHaveBeenCalled();
+  });
+});
+
+describe("useThisSuggestion", () => {
+  it("writes an audit_events row with the expected call shape", async () => {
+    const auditInsertSpy = vi.fn().mockResolvedValue({ error: null });
+    mockedCreateClient.mockResolvedValue({
+      from(table: string) {
+        if (table === "agent_suggestions") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () =>
+                  Promise.resolve({
+                    data: {
+                      id: FAKE_SUGGESTION_ID,
+                      unit_id: FAKE_UNIT_ID,
+                      output: {
+                        suggestions: [
+                          { title: "Capture the flag" },
+                        ],
+                      },
+                    },
+                    error: null,
+                  }),
+              }),
+            }),
+          };
+        }
+        if (table === "audit_events") {
+          return { insert: auditInsertSpy };
+        }
+        throw new Error(`unexpected table: ${table}`);
+      },
+    } as never);
+
+    const formData = new FormData();
+    formData.set("suggestion_id", FAKE_SUGGESTION_ID);
+    formData.set("index", "0");
+    formData.set("target_date", "2026-06-03");
+
+    // The action terminates with redirect(); the mock throws a sentinel.
+    await expect(useThisSuggestion(formData)).rejects.toThrow(/^NEXT_REDIRECT:/);
+
+    expect(auditInsertSpy).toHaveBeenCalledTimes(1);
+    expect(auditInsertSpy).toHaveBeenCalledWith({
+      unit_id: FAKE_UNIT_ID,
+      actor_user_id: FAKE_USER_ID,
+      action: "activity_suggestion_used",
+      target_table: "agent_suggestions",
+      target_id: FAKE_SUGGESTION_ID,
+      metadata: { index: 0, title: "Capture the flag" },
+    });
   });
 });
