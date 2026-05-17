@@ -35,6 +35,7 @@ function UnitSwitcherDropdown({ memberships, activeUnit }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -46,10 +47,14 @@ function UnitSwitcherDropdown({ memberships, activeUnit }: Props) {
         !containerRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
+        setError(null);
       }
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        setError(null);
+      }
     }
     document.addEventListener("mousedown", onClickOutside);
     document.addEventListener("keydown", onKey);
@@ -88,9 +93,11 @@ function UnitSwitcherDropdown({ memberships, activeUnit }: Props) {
   async function selectUnit(unitId: string) {
     if (unitId === activeUnit.unit.id) {
       setOpen(false);
+      setError(null);
       return;
     }
     setPendingId(unitId);
+    setError(null);
     try {
       const res = await fetch("/api/active-unit", {
         method: "POST",
@@ -98,12 +105,32 @@ function UnitSwitcherDropdown({ memberships, activeUnit }: Props) {
         body: JSON.stringify({ unit_id: unitId }),
       });
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error("UnitSwitcher: failed to set active unit", text);
+        // Try to surface the route's structured error; fall back to a
+        // status-derived message so the leader at least sees that the
+        // switch didn't take effect.
+        let message = `Couldn't switch units (HTTP ${res.status}).`;
+        try {
+          const body = (await res.json()) as { error?: unknown };
+          if (typeof body.error === "string" && body.error.length > 0) {
+            message = body.error;
+          }
+        } catch {
+          // Body wasn't JSON; keep the status-derived fallback.
+        }
+        console.error("UnitSwitcher: failed to set active unit", message);
+        setError(message);
         return;
       }
       setOpen(false);
+      setError(null);
       router.refresh();
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? `Couldn't reach the server: ${err.message}`
+          : "Couldn't reach the server.";
+      console.error("UnitSwitcher: network error", err);
+      setError(message);
     } finally {
       setPendingId(null);
     }
@@ -136,6 +163,14 @@ function UnitSwitcherDropdown({ memberships, activeUnit }: Props) {
           role="menu"
           className="absolute right-0 z-50 mt-2 w-72 origin-top-right rounded-md border border-slate-200 bg-white p-1 shadow-lg"
         >
+          {error ? (
+            <p
+              role="alert"
+              className="mx-1 mb-1 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800"
+            >
+              {error}
+            </p>
+          ) : null}
           {memberships.map((m, i) => {
             const isActive = m.unit.id === activeUnit.unit.id;
             return (
